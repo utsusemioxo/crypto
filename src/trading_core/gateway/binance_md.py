@@ -45,7 +45,7 @@ class BinanceMarketDataGateway:
     - expose callback to consume MarketEvent (e.g., recorder.append)
     """
     symbol: str
-    on_event: callable[[MarketEvent], None]
+    on_event: Callable[[MarketEvent], None]
     source: str = "binance"
     _tracker: SeqTracker = field(default_factory=SeqTracker)
 
@@ -85,13 +85,30 @@ class BinanceMarketDataGateway:
                 jitter = random.uniform(0, 0.3)
                 sleep_s = min(max_backoff_s, backoff_s) + jitter
                 # You can log this; keep minimal for now
-                # print(f"[md] error={e!r}, reconnecting in {sleep_s:.2f}s")
+                print(f"[md] error={e!r}, reconnect in {sleep_s:.2f}s")
                 await asyncio.sleep(sleep_s)
                 backoff_s *= 1.8
         
     async def _consume(self, ws: WebSocketClientProtocol) -> None:
-        async for raw in ws:
+        last_msg_ns = monotonic_ns()
+
+        recv_timeout_s = 3
+        stale_timeout_ns = int(15 * 1e9) # 15s 没消息认为连接挂了(可以调节)
+
+        while True:
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=recv_timeout_s)
+            except asyncio.TimeoutError:
+                now = monotonic_ns()
+                if now - last_msg_ns > stale_timeout_ns:
+                    raise RuntimeError("stale websocket: no messages")
+                continue
+            
             ts_recv = monotonic_ns()
+            last_msg_ns = ts_recv
+
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8", errors="replace")
             me = self._parse_book_ticker(raw, ts_recv_ns=ts_recv)
             if me is not None:
                 self.on_event(me)
