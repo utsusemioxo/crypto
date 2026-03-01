@@ -12,3 +12,6 @@ wheels/
 
 # exclude ndjson files
 *.ndjson
+
+# never include .env
+.env
