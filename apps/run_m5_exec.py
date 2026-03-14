@@ -10,7 +10,7 @@ from trading_core.bus.bus import EventBus
 from trading_core.core.oms import OMS, OrderEvent, OrderIntent
 from trading_core.gateway.binance_rest_exec import BinanceRestConfig, BinanceRestExecutionGateway
 from trading_core.gateway.binance_wsapi_userstream import BinanceWsApiConfig, BinanceWsApiUserStream
-from trading_core.core import monotonic_ns
+from trading_core.core import monotonic_ns, risk
 
 async def main() -> None:
     """
@@ -60,16 +60,18 @@ async def main() -> None:
         except Exception as e:
             # Emit a REJECT-like event when we know the REST call failed locally.
             # Note: a timeout is ambiguous in reality; for M5 minimal, treat it as error but do not retry.
-            bus.publish(
-                OrderEvent(
-                    type="order",
-                    intent_id=it.intent_id,
-                    exchange_order_id="",
-                    status="REJECTED",
-                    ts_ns=it.ts_ns,
-                    reason=f"rest_error:{type(e).__name__}:{e}",
+            rej = risk.check(it)
+            if rej is not None:
+                bus.publish(
+                    OrderEvent(
+                        type="order",
+                        intent_id=it.intent_id,
+                        exchange_order_id="",
+                        status="REJECTED",
+                        ts_ns=it.ts_ns,
+                        reason=f"rest_error:{type(e).__name__}:{e}",
+                    )
                 )
-            )
     
     bus.subscribe("intent", lambda it: asyncio.create_task(handle_intent(it)))
 

@@ -187,7 +187,7 @@ class BinanceWsApiUserStream:
             reason = str(ev.get("r", "")) if x == "REJECTED" else ""
             out.append(
                 OrderEvent(
-                    type="fill",
+                    type="order",
                     intent_id=intent_id,
                     exchange_order_id=exchange_order_id,
                     status=status_map[x],
