@@ -13,8 +13,12 @@ import websockets
 from websockets import WebSocketClientProtocol
 from trading_core.core.oms import OrderEvent, FillEvent
 
+
 def _hmac_sha256_hex(secret: str, payload: str) -> str:
-    return hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
 
 def _sorted_query_string(params: Dict[str, Any]) -> str:
     """
@@ -28,6 +32,7 @@ def _sorted_query_string(params: Dict[str, Any]) -> str:
     items = sorted(params.items(), key=lambda kv: kv[0])
     return "&".join(f"{k}={v}" for k, v in items)
 
+
 @dataclass(slots=True)
 class BinanceWsApiConfig:
     """
@@ -37,6 +42,7 @@ class BinanceWsApiConfig:
     - Prod:    wss://ws-api.binance.com:443/ws-api/v3
     - Testnet: wss://ws-api.testnet.binance.vision/ws-api/v3
     """
+
     api_key: str
     api_secret: str
     ws_api_url: str
@@ -47,6 +53,7 @@ class BinanceWsApiConfig:
     close_timeout_s: int = 5
     max_queue: int = 2000
 
+
 @dataclass(slots=True)
 class BinanceWsApiUserStream:
     """
@@ -56,14 +63,14 @@ class BinanceWsApiUserStream:
     - Maintain a private WS connection
     - Subscribe using userDataStream.subscribe.signature (HMAC)
     - Convert executionReport into internal OrderEvent / FillEvent
-    
+
     Boundaries:
     - Does NOT keep order state (OMS is the source of truth)
     - Must tolerate duplicates and out-of-order messages (OMS handles idempotency/state)
     """
 
     cfg: BinanceWsApiConfig
-    on_event: Callable[[object], None] # publish callback into your EventBus
+    on_event: Callable[[object], None]  # publish callback into your EventBus
 
     async def run_forever(self) -> None:
         """
@@ -87,7 +94,7 @@ class BinanceWsApiUserStream:
                     print(f"[us] subscribed subscriptionId={sub_id}")
                     backoff_s = 0.5
                     await self._consume(ws)
-            
+
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -95,7 +102,7 @@ class BinanceWsApiUserStream:
                 jitter = random.uniform(0, 0.3)
                 await asyncio.sleep(min(max_backoff_s, backoff_s) + jitter)
                 backoff_s *= 1.8
-            
+
     async def _subscribe_signature(self, ws: WebSocketClientProtocol) -> int:
         """
         Subscribe to user data stream using a signed request.
@@ -111,7 +118,7 @@ class BinanceWsApiUserStream:
         params["signature"] = _hmac_sha256_hex(self.cfg.api_secret, payload)
 
         req = {
-            "id": f"sub-{int(time.time()*1000)}",
+            "id": f"sub-{int(time.time() * 1000)}",
             "method": "userDataStream.subscribe.signature",
             "params": params,
         }
@@ -121,10 +128,10 @@ class BinanceWsApiUserStream:
         msg = json.loads(raw)
         if msg.get("status") != 200:
             raise RuntimeError(f"subscribe failed: {msg}")
-        
+
         result = msg.get("result") or {}
         return int(result.get("subscruptionId", 0))
-    
+
     async def _consume(self, ws: WebSocketClientProtocol) -> None:
         """
         Consume subscription frames:
@@ -145,7 +152,7 @@ class BinanceWsApiUserStream:
                 if out is not None:
                     for e in out:
                         self.on_event(e)
-    
+
     def _translate_execution_report(self, ev: Dict[str, Any]) -> Optional[list[object]]:
         """
         Translate Binance executionReport -> OrderEvent / FillEvent.
@@ -160,8 +167,8 @@ class BinanceWsApiUserStream:
         # Required identifiers
         intent_id = ev.get("c")
         exch_id = ev.get("i")
-        x = ev.get("x") # execution type
-        X = ev.get("X") # order status
+        x = ev.get("x")  # execution type
+        X = ev.get("X")  # order status
 
         if not intent_id or exch_id is None or not x:
             return None
@@ -182,7 +189,7 @@ class BinanceWsApiUserStream:
                 "NEW": "ACK",
                 "REJECTED": "REJECTED",
                 "CANCELED": "CANCELED",
-                "EXPIRED": "CANCELED", # Minimal M5: treat EXPIRED as canceled-like terminal
+                "EXPIRED": "CANCELED",  # Minimal M5: treat EXPIRED as canceled-like terminal
             }
             reason = str(ev.get("r", "")) if x == "REJECTED" else ""
             out.append(
@@ -196,15 +203,15 @@ class BinanceWsApiUserStream:
                 )
             )
             return out
-        
+
         # Trade fills
         if x == "TRADE":
             try:
-                last_qty = float(ev.get("l", 0.0)) # last executed quantity
+                last_qty = float(ev.get("l", 0.0))  # last executed quantity
                 last_px = float(ev.get("L", 0.0))  # last executed price
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
-            
+
             if last_qty > 0:
                 out.append(
                     FillEvent(
@@ -216,7 +223,7 @@ class BinanceWsApiUserStream:
                         ts_ns=ts_ns,
                     )
                 )
-            
+
             # Optional: also emit a coarse order status hint from X.
             # OMS can infer from fills, but explicit terminal/partial signals are useful in practice.
             if X in ("PARTIALLY_FILLED", "FILLED"):
@@ -231,5 +238,5 @@ class BinanceWsApiUserStream:
                     )
                 )
             return out
-        
+
         return None

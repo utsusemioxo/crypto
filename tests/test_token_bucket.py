@@ -1,6 +1,7 @@
 import pytest
 from trading_core.core.risk import TokenBucket
 
+
 def test_token_bucket_initialization():
     """
     Test correct initialization of TokenBucket properties.
@@ -17,6 +18,7 @@ def test_token_bucket_initialization():
     assert bucket.capacity == 10.0
     assert bucket.refill_rate == 2.0
 
+
 def test_token_bucket_refill_logic():
     """
     Test core token refill mechanics of the _refill method.
@@ -26,29 +28,30 @@ def test_token_bucket_refill_logic():
     2. Tokens refill proportionally to elapsed time (capped at capacity)
     3. No refill/update if timestamp is non-increasing (time rollback protection)
     """
-    bucket = TokenBucket(capacity=10.0, refill_rate=2.0) # 2 tokens per second
+    bucket = TokenBucket(capacity=10.0, refill_rate=2.0)  # 2 tokens per second
 
     # Scenario 1: First refill call (initialize timestamp only)
-    bucket._refill(now_ns=1_000_000_000) # 1 second (1e9 nanoseconds)
+    bucket._refill(now_ns=1_000_000_000)  # 1 second (1e9 nanoseconds)
     assert bucket.last_ts_ns == 1_000_000_000
-    assert bucket.tokens == pytest.approx(10.0) # Bucket full - no change
+    assert bucket.tokens == pytest.approx(10.0)  # Bucket full - no change
 
     # Scenario 2: Refill after partial token consumption
-    bucket.tokens -= 5.0 # Manually consume 5 tokens (5 remaining)
-    bucket._refill(now_ns=3_000_000_000) # 2 seconds elapsed
+    bucket.tokens -= 5.0  # Manually consume 5 tokens (5 remaining)
+    bucket._refill(now_ns=3_000_000_000)  # 2 seconds elapsed
     # Refill calculation: 2s * 2 tokens/s = 4 tokens -> 5 + 4 = 9
     assert bucket.tokens == pytest.approx(9.0)
     assert bucket.last_ts_ns == 3_000_000_000
 
     # Scenario 3: Refill capped at maximum capacity
-    bucket._refill(now_ns=6_000_000_000) # 3 seconds elapsed -> 3*2=6 tokens
+    bucket._refill(now_ns=6_000_000_000)  # 3 seconds elapsed -> 3*2=6 tokens
     # 9 + 6 = 15 -> capped at capacity (10)
     assert bucket.tokens == pytest.approx(10.0)
 
     # Scenario 4: No refill for non-increasing timestamp (time rollback)
-    bucket._refill(now_ns=5_000_000_000) # Timestamp < last refill time
-    assert bucket.tokens == pytest.approx(10.0) # No token change
-    assert bucket.last_ts_ns == 6_000_000_000 # Timestamp unchanged
+    bucket._refill(now_ns=5_000_000_000)  # Timestamp < last refill time
+    assert bucket.tokens == pytest.approx(10.0)  # No token change
+    assert bucket.last_ts_ns == 6_000_000_000  # Timestamp unchanged
+
 
 def test_token_bucket_allow_basic():
     """
@@ -77,38 +80,40 @@ def test_token_bucket_allow_basic():
 
     # Scenario 4: Restored allowance after time-based refill
     # 2 seconds elapsed -> 2 tokens refilled
-    assert bucket.allow(now_ns=3_000_000_000) is True # Consume 1 token (1 left)
+    assert bucket.allow(now_ns=3_000_000_000) is True  # Consume 1 token (1 left)
     assert bucket.tokens == pytest.approx(1.0)
-    assert bucket.allow(now_ns=3_000_000_000) is True # Consume remaining token
-    assert bucket.allow(now_ns=3_000_000_000) is False # Rejected (0 tokens left)
+    assert bucket.allow(now_ns=3_000_000_000) is True  # Consume remaining token
+    assert bucket.allow(now_ns=3_000_000_000) is False  # Rejected (0 tokens left)
+
 
 def test_token_bucket_allow_custom_cost():
     """
     Test allow() method with custom token costs (non-default consumption).
-    
+
     Validates:
     1. Requests with custom integer token costs
     2. Requests with fractional token costs
     3. Rejection when cost exceeds available tokens
     """
     bucket = TokenBucket(capacity=5.0, refill_rate=1.0)
-    
+
     # Scenario 1: Allowed request with custom integer cost (2 tokens)
     assert bucket.allow(now_ns=1_000_000_000, cost=2.0) is True
     assert bucket.tokens == pytest.approx(3.0)
-    
+
     # Scenario 2: Rejected request (cost > available tokens)
     assert bucket.allow(now_ns=1_000_000_000, cost=4.0) is False
     assert bucket.tokens == pytest.approx(3.0)  # No token consumption
-    
+
     # Scenario 3: Allowed request with fractional cost (0.5 tokens)
     assert bucket.allow(now_ns=1_000_000_000, cost=0.5) is True
     assert bucket.tokens == pytest.approx(2.5)
 
+
 def test_token_bucket_edge_cases():
     """
     Test edge cases for extreme operating conditions.
-    
+
     Validates:
     1. Zero-capacity bucket (always rejects requests)
     2. Zero-refill rate (permanent rejection after token exhaustion)

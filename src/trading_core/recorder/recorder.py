@@ -6,12 +6,15 @@ import json
 import secrets
 from typing import Protocol
 
+
 class JsonSerializable(Protocol):
     def to_json(self) -> str: ...
+
 
 def new_session_id(prefix: str = "sess") -> str:
     # Short unique id, good enough for local dev and replay grouping.
     return f"{prefix}-{secrets.token_hex(4)}"
+
 
 @dataclass(slots=True)
 class NdjsonRecorder:
@@ -21,6 +24,7 @@ class NdjsonRecorder:
     - One event per line (JSON object)
     - Injects `session_id` into every written record.
     """
+
     path: Path
     session_id: str = field(default_factory=new_session_id)
     flush_each: bool = True

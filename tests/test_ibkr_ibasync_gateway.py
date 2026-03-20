@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from trading_core.gateway.ibkr_ibasync_gateway import _status_to_order_event, _to_ns_from_time_like
+from trading_core.gateway.ibkr_ibasync_gateway import (
+    _status_to_order_event,
+    _to_ns_from_time_like,
+)
 
 
 def test_status_mapping_known_values():

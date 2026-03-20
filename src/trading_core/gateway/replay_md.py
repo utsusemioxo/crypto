@@ -8,6 +8,7 @@ import json
 
 from trading_core.core import MarketEvent
 
+
 @dataclass(slots=True)
 class ReplayMarketDataGateway:
     """
@@ -21,10 +22,11 @@ class ReplayMarketDataGateway:
     "Same Behavior" means: replays emits the same internal Market schema
     through the same on_event callback used by live.
     """
+
     path: Path
     on_event: Callable[[MarketEvent], None]
     speed: float = 1.0
-    only_symbol: str | None = None # e.g. "btcusdt"
+    only_symbol: str | None = None  # e.g. "btcusdt"
 
     async def run(self) -> None:
         prev_ts: int | None = None

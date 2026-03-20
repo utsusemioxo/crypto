@@ -4,19 +4,22 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Optional, Set, List, Tuple
 
+
 @dataclass(frozen=True, slots=True)
 class OrderIntent:
     """
     Strategy -> OMS.
     This is "I want to place an order" (not yet accepted by exchange)
     """
+
     type: str
     intent_id: str
     symbol: str
-    side: str # "buy" / "sell"
+    side: str  # "buy" / "sell"
     qty: float
     price: float
     ts_ns: int
+
 
 @dataclass(frozen=True, slots=True)
 class OrderEvent:
@@ -24,12 +27,14 @@ class OrderEvent:
     ExecGateway -> OMS
     Exchange lifecycle signals about an order.
     """
+
     type: str
     intent_id: str
     exchange_order_id: str
-    status: str # "ACK" / "RECECT" / "CANCELED"
+    status: str  # "ACK" / "RECECT" / "CANCELED"
     ts_ns: int
     reason: str = ""
+
 
 @dataclass(frozen=True, slots=True)
 class FillEvent:
@@ -37,12 +42,14 @@ class FillEvent:
     ExecGateway -> OMS.
     Trade fills for an order.
     """
+
     type: str
     intent_id: str
     exchange_order_id: str
     qty: float
     price: float
     ts_ns: int
+
 
 class OrderStatus(str, Enum):
     NEW = "NEW"
@@ -51,6 +58,7 @@ class OrderStatus(str, Enum):
     FILLED = "FILLED"
     CANCELED = "CANCELED"
     REJECTED = "REJECTED"
+
 
 @dataclass(slots=True)
 class OrderRecord:
@@ -69,11 +77,15 @@ class OrderRecord:
     # Idempotency: remember processed external events (ack/fill/cancel/reject)
     processed: Set[Tuple] = field(default_factory=set)
 
-def _update_avg_px(avg_px: float, filled_qty: float, new_qty: float, new_px: float) -> float:
+
+def _update_avg_px(
+    avg_px: float, filled_qty: float, new_qty: float, new_px: float
+) -> float:
     # volume-weighted average price
     notional = avg_px * filled_qty + new_px * new_qty
     total = filled_qty + new_qty
     return notional / total if total > 0 else 0.0
+
 
 @dataclass(slots=True)
 class OMS:
@@ -86,8 +98,11 @@ class OMS:
     - idempotent processing (duplicates don't double count)
     - out-of-order tolerance (e.g., fill arrives before ack)
     """
+
     by_intent: Dict[str, OrderRecord] = field(default_factory=dict)
-    by_exch: Dict[str, str] = field(default_factory=dict) # exchange_order_id -> intent_id
+    by_exch: Dict[str, str] = field(
+        default_factory=dict
+    )  # exchange_order_id -> intent_id
 
     def on_intent(self, it: OrderIntent) -> None:
         """
@@ -97,7 +112,7 @@ class OMS:
         if it.intent_id in self.by_intent:
             # Duplicate intent submit: treat as idempotent no-op.
             return
-        
+
         self.by_intent[it.intent_id] = OrderRecord(
             intent_id=it.intent_id,
             symbol=it.symbol,
@@ -106,7 +121,7 @@ class OMS:
             price=it.price,
             status=OrderStatus.NEW,
         )
-    
+
     def on_order_event(self, ev: OrderEvent):
         """
         Proecss ACK/REJECT/CANCELED
@@ -121,13 +136,17 @@ class OMS:
         if ev.exchange_order_id:
             rec.exchange_order_id = ev.exchange_order_id
             self.by_exch[ev.exchange_order_id] = rec.intent_id
-        
+
         if ev.status == "ACK":
             # If already terminal (e.g., fill arrived first and completed), ignore ACK.
-            if rec.status in (OrderStatus.FILLED, OrderStatus.CANCELED, OrderStatus.REJECTED):
+            if rec.status in (
+                OrderStatus.FILLED,
+                OrderStatus.CANCELED,
+                OrderStatus.REJECTED,
+            ):
                 return
             rec.status = OrderStatus.ACK
-        
+
         elif ev.status == "REJECTED":
             # if already has fills, keep conservative (ignore)
             if rec.filled_qty > 0:
@@ -139,9 +158,10 @@ class OMS:
             if rec.status == OrderStatus.FILLED:
                 return
             rec.status = OrderStatus.CANCELED
-        
-        else: raise ValueError(f"Unknown OrderEvent.status: {ev.status}")
-    
+
+        else:
+            raise ValueError(f"Unknown OrderEvent.status: {ev.status}")
+
     def on_fill(self, ev: FillEvent) -> None:
         """
         Process fills. Must be idempotent and safe under duplicates/out-of-order.
@@ -158,21 +178,23 @@ class OMS:
         if ev.exchange_order_id:
             rec.exchange_order_id = ev.exchange_order_id
             self.by_exch[ev.exchange_order_id] = rec.intent_id
-        
+
         # Terminal guards
         if rec.status in (OrderStatus.CANCELED, OrderStatus.REJECTED):
             # Conservative: ignore fills after cancel/reject (or log anomaly).
             return
-        
+
         # Apply fill
         prev_filled = rec.filled_qty
-        rec.avg_fill_px = _update_avg_px(rec.avg_fill_px, rec.filled_qty, ev.qty, ev.price)
+        rec.avg_fill_px = _update_avg_px(
+            rec.avg_fill_px, rec.filled_qty, ev.qty, ev.price
+        )
         rec.filled_qty += ev.qty
 
         # Update status
         # If qty not known (0), we still treat first fill as PARTIAL then maybe FILLED if exact.
         if rec.qty > 0 and rec.filled_qty >= rec.qty:
-            rec.filled_qty = rec.qty # clamp
+            rec.filled_qty = rec.qty  # clamp
             rec.status = OrderStatus.FILLED
         else:
             # If we were NEW and got fill first, move to PARTIAL (out-of-order tolerated).
@@ -180,7 +202,7 @@ class OMS:
                 rec.status = OrderStatus.PARTIAL
             elif rec.status != OrderStatus.FILLED:
                 rec.status = OrderStatus.PARTIAL
-    
+
     # --- helper function ---
     def _get_or_create(self, intent_id: str, exchange_order_id: str) -> OrderRecord:
         # prefer existing by intent_id
@@ -194,7 +216,11 @@ class OMS:
             return self.by_intent[mapped_intent]
 
         # Create placeholder record (happens under out-of-order events)
-        rec = OrderRecord(intent_id=intent_id, exchange_order_id=exchange_order_id, status=OrderStatus.NEW)
+        rec = OrderRecord(
+            intent_id=intent_id,
+            exchange_order_id=exchange_order_id,
+            status=OrderStatus.NEW,
+        )
         self.by_intent[intent_id] = rec
         if exchange_order_id:
             self.by_exch[exchange_order_id] = intent_id

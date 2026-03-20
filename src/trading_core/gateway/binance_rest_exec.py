@@ -11,8 +11,12 @@ import httpx
 
 from trading_core.core.oms import OrderIntent
 
+
 def _hmac_sha256_hex(secret: str, payload: str) -> str:
-    return hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
 
 def _signed_query(params: Dict[str, Any], api_secret: str) -> str:
     """
@@ -27,6 +31,7 @@ def _signed_query(params: Dict[str, Any], api_secret: str) -> str:
     sig = _hmac_sha256_hex(api_secret, qs)
     return f"{qs}&signature={sig}"
 
+
 @dataclass(slots=True)
 class BinanceRestConfig:
     """
@@ -36,12 +41,14 @@ class BinanceRestConfig:
     - Spot prod:    https://api.binance.com
     - Spot testnet: https://testnet.binance.vision
     """
+
     api_key: str
     api_secret: str
     rest_base: str
-    
+
     recv_window_ms: int = 5000
     timeout_s: float = 10.0
+
 
 @dataclass(slots=True)
 class BinanceRestExecutionGateway:
@@ -55,7 +62,9 @@ class BinanceRestExecutionGateway:
 
     cfg: BinanceRestConfig
 
-    async def place_limit(self, it: OrderIntent, *, time_in_force: str = "GTC") -> Dict[str, Any]:
+    async def place_limit(
+        self, it: OrderIntent, *, time_in_force: str = "GTC"
+    ) -> Dict[str, Any]:
         """
         Place a LIMIT order.
 

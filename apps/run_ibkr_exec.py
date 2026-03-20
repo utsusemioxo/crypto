@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 from trading_core.bus.bus import EventBus
 from trading_core.core import monotonic_ns
 from trading_core.core.oms import OMS, OrderEvent, OrderIntent
-from trading_core.gateway.ibkr_ibasync_gateway import IbkrIbAsyncConfig, IbkrIbAsyncGateway
+from trading_core.gateway.ibkr_ibasync_gateway import (
+    IbkrIbAsyncConfig,
+    IbkrIbAsyncGateway,
+)
 
 load_dotenv()
 

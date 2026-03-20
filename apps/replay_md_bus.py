@@ -5,6 +5,7 @@ from trading_core.bus.bus import EventBus
 from trading_core.gateway.replay_md import ReplayMarketDataGateway
 from trading_core.recorder.recorder import NdjsonRecorder
 
+
 async def main() -> None:
     bus = EventBus(max_queue=200_000)
 
@@ -27,6 +28,7 @@ async def main() -> None:
         pass
 
     out.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -4,11 +4,14 @@ from dataclasses import dataclass, field
 from collections import deque
 from typing import Callable, Deque, Dict, List, Protocol, Any
 
+
 class Event(Protocol):
     # Event json: {"type": "..."}
     type: str
 
+
 Handler = Callable[[Event], None]
+
 
 @dataclass(slots=True)
 class EventBus:
@@ -19,10 +22,13 @@ class EventBus:
     - subscribe(event_type, handler): register handler for that type
     - run_forever(): pop -> dispatch to handlers (single thread)
     """
+
     max_queue: int = 100_000
 
     _q: Deque[Event] = field(default_factory=deque, init=False, repr=False)
-    _handlers: Dict[str, List[Handler]] = field(default_factory=dict, init=False, repr=False)
+    _handlers: Dict[str, List[Handler]] = field(
+        default_factory=dict, init=False, repr=False
+    )
     _dropped: int = field(default=0, init=False)
 
     def subscribe(self, event_type: str, handler: Handler) -> None:
@@ -42,7 +48,7 @@ class EventBus:
         """
         if not self._q:
             return 0
-        
+
         ev = self._q.popleft()
         handlers = self._handlers.get(getattr(ev, "type", ""), [])
         for h in handlers:
@@ -59,11 +65,10 @@ class EventBus:
                 break
             processed += 1
         return processed
-    
+
     def status(self) -> dict[str, Any]:
         return {
             "queue_len": len(self._q),
             "dropped": self._dropped,
             "handlers": {k: len(v) for k, v in self._handlers.items()},
         }
-        

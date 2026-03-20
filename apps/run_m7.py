@@ -42,10 +42,10 @@ async def main() -> None:
     # ---- M6: Risk engine ----
     risk = RiskEngine(
         cfg=RiskConfig(
-            max_position=0.001,   # absolute net position limit
-            max_order_qty=0.0003, # per-order qty limit
-            rate_capacity=5,      # burst
-            rate_per_sec=2,       # steady rate
+            max_position=0.001,  # absolute net position limit
+            max_order_qty=0.0003,  # per-order qty limit
+            rate_capacity=5,  # burst
+            rate_per_sec=2,  # steady rate
         ),
         oms=oms,
     )

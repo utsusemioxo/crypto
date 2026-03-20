@@ -5,6 +5,7 @@ from trading_core.bus.bus import EventBus
 from trading_core.gateway.binance_md import BinanceMarketDataGateway
 from trading_core.recorder.recorder import NdjsonRecorder
 
+
 async def main() -> None:
     bus = EventBus(max_queue=200_000)
 
@@ -17,9 +18,7 @@ async def main() -> None:
 
     # Gateway publishes into bus (instead of calling recorder directly)
     gw = BinanceMarketDataGateway(
-        symbol="btcusdt",
-        on_event=bus.publish,
-        source="binance"
+        symbol="btcusdt", on_event=bus.publish, source="binance"
     )
 
     try:
@@ -30,11 +29,12 @@ async def main() -> None:
         while True:
             processed = bus.run_batch(5000)
             if processed == 0:
-                await asyncio.sleep(0) # yield to other tasks
-    
+                await asyncio.sleep(0)  # yield to other tasks
+
     finally:
         rec.close()
         gw_task.cancel()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

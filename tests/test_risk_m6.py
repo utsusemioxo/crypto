@@ -5,13 +5,14 @@ import pytest
 from trading_core.core.oms import OMS, OrderIntent, OrderEvent, FillEvent
 from trading_core.core.risk import RiskConfig, RiskEngine
 
+
 def _mk_risk(
-        oms: OMS,
-        *,
-        max_position: float = 1.0,
-        max_order_qty: float = 0.5,
-        rate_capacity: float = 2.0,
-        rate_per_sec: float = 0.0, # default 0 => deterministic rate-limit in tests
+    oms: OMS,
+    *,
+    max_position: float = 1.0,
+    max_order_qty: float = 0.5,
+    rate_capacity: float = 2.0,
+    rate_per_sec: float = 0.0,  # default 0 => deterministic rate-limit in tests
 ) -> RiskEngine:
     return RiskEngine(
         cfg=RiskConfig(
@@ -23,14 +24,15 @@ def _mk_risk(
         oms=oms,
     )
 
+
 def _intent(
-        intent_id: str,
-        *,
-        symbol: str = "btcusdt",
-        side: str = "buy",
-        qty: float = 0.1,
-        price: float = 100.0,
-        ts_ns: int = 1_000,
+    intent_id: str,
+    *,
+    symbol: str = "btcusdt",
+    side: str = "buy",
+    qty: float = 0.1,
+    price: float = 100.0,
+    ts_ns: int = 1_000,
 ) -> OrderIntent:
     return OrderIntent(
         type="intent",
@@ -42,14 +44,15 @@ def _intent(
         ts_ns=ts_ns,
     )
 
+
 def _apply_fill(
-        oms: OMS,
-        *,
-        intent_id: str,
-        symbol: str,
-        side: str,
-        order_qty: float,
-        fill_qty: float,
+    oms: OMS,
+    *,
+    intent_id: str,
+    symbol: str,
+    side: str,
+    order_qty: float,
+    fill_qty: float,
 ) -> None:
     """
     Build OMS state so RiskEngine can compute position from OMS fills.
@@ -58,9 +61,7 @@ def _apply_fill(
     1) submit an intent to create OrderRecord with symbol/side/qty
     2) apply a fill event to increase filled_qty
     """
-    oms.on_intent(
-        _intent(intent_id, symbol=symbol, side=side, qty=order_qty, ts_ns=10)
-    )
+    oms.on_intent(_intent(intent_id, symbol=symbol, side=side, qty=order_qty, ts_ns=10))
     oms.on_fill(
         FillEvent(
             type="fill",
@@ -68,9 +69,10 @@ def _apply_fill(
             exchange_order_id="ex-1",
             qty=fill_qty,
             price=100.0,
-            ts_ns=11
+            ts_ns=11,
         )
     )
+
 
 def test_rejects_bad_qty_and_side():
     oms = OMS()
@@ -88,6 +90,7 @@ def test_rejects_bad_qty_and_side():
     assert out.status == "REJECTED"
     assert "bad_side" in out.reason
 
+
 def test_rejects_max_order_qty_exceeded():
     oms = OMS()
     risk = _mk_risk(oms, max_order_qty=0.5)
@@ -96,6 +99,7 @@ def test_rejects_max_order_qty_exceeded():
     assert isinstance(out, OrderEvent)
     assert out.status == "REJECTED"
     assert "max_order_qty_exceeded" in out.reason
+
 
 def test_rate_limiter_token_bucket_exhausts_then_rejects():
     """
@@ -113,6 +117,7 @@ def test_rate_limiter_token_bucket_exhausts_then_rejects():
     assert isinstance(out, OrderEvent)
     assert out.status == "REJECTED"
     assert "rate_limited" in out.reason
+
 
 def test_rate_limiter_refills_over_time_allows_again():
     """
@@ -133,6 +138,7 @@ def test_rate_limiter_refills_over_time_allows_again():
     out2 = risk.check(_intent("i3", ts_ns=int(2e9)))
     assert out2 is None
 
+
 def test_rejects_max_position_exceeded_buy():
     """
     Current position +0.9 BTC, try buy +0.2 => projected 1.1 > 1.0 => reject.
@@ -147,12 +153,15 @@ def test_rejects_max_position_exceeded_buy():
         fill_qty=0.9,
     )
 
-    risk = _mk_risk(oms, max_position=1.0, max_order_qty=1.0, rate_capacity=100, rate_per_sec=0.0)
+    risk = _mk_risk(
+        oms, max_position=1.0, max_order_qty=1.0, rate_capacity=100, rate_per_sec=0.0
+    )
 
     out = risk.check(_intent("i1", symbol="btcusdt", side="buy", qty=0.2, ts_ns=100))
     assert isinstance(out, OrderEvent)
     assert out.status == "REJECTED"
     assert "max_position_exceeded" in out.reason
+
 
 def test_rejects_max_position_exceeded_sell_short():
     """
@@ -168,16 +177,21 @@ def test_rejects_max_position_exceeded_sell_short():
         fill_qty=0.8,
     )
 
-    risk = _mk_risk(oms, max_position=1.0, max_order_qty=1.0, rate_capacity=100, rate_per_sec=0.0)
+    risk = _mk_risk(
+        oms, max_position=1.0, max_order_qty=1.0, rate_capacity=100, rate_per_sec=0.0
+    )
 
     out = risk.check(_intent("i1", symbol="btcusdt", side="sell", qty=0.3, ts_ns=100))
     assert isinstance(out, OrderEvent)
     assert out.status == "REJECTED"
     assert "max_position_exceeded" in out.reason
 
+
 def test_allows_valid_intent():
     oms = OMS()
-    risk = _mk_risk(oms, max_position=1.0, max_order_qty=0.5, rate_capacity=10, rate_per_sec=0.0)
+    risk = _mk_risk(
+        oms, max_position=1.0, max_order_qty=0.5, rate_capacity=10, rate_per_sec=0.0
+    )
 
     out = risk.check(_intent("ok", qty=0.1, ts_ns=100))
     assert out is None

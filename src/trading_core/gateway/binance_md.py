@@ -14,6 +14,7 @@ from trading_core.core import MarketEvent, monotonic_ns
 
 BINANCE_WS_BASE = "wss://stream.binance.com:9443/ws"
 
+
 @dataclass(slots=True)
 class SeqTracker:
     """
@@ -23,6 +24,7 @@ class SeqTracker:
     - gaps (should not happen locally)
     - discontinuity across reconnect (expected, but we mark it)
     """
+
     seq: int = 0
     last_session: int = 0
 
@@ -32,7 +34,8 @@ class SeqTracker:
 
     def new_session(self) -> None:
         self.last_session += 1
-    
+
+
 @dataclass(slots=True)
 class BinanceMarketDataGateway:
     """
@@ -44,6 +47,7 @@ class BinanceMarketDataGateway:
     - local seq generation
     - expose callback to consume MarketEvent (e.g., recorder.append)
     """
+
     symbol: str
     on_event: Callable[[MarketEvent], None]
     source: str = "binance"
@@ -53,7 +57,7 @@ class BinanceMarketDataGateway:
         # bookTicker stream: <symbol>@bookTicker
         stream = f"{self.symbol.lower()}@bookTicker"
         return f"{BINANCE_WS_BASE}/{stream}"
-    
+
     async def run_forever(self) -> None:
         backoff_s = 0.5
         max_backoff_s = 20.0
@@ -69,18 +73,20 @@ class BinanceMarketDataGateway:
                     ping_interval=20,
                     ping_timeout=20,
                     close_timeout=5,
-                    max_queue=1000, # prevent unbounded memory growth
+                    max_queue=1000,  # prevent unbounded memory growth
                 ) as ws:
                     print(f"[md] connected session={self._tracker.last_session}")
                     await self._consume(ws)
                 # Normal close -> reset backoff
                 backoff_s = 0.5
-            
+
             except asyncio.CancelledError:
                 raise
-        
+
             except Exception as e:
-                print(f"[md] disconnect session={self._tracker.last_session} err={type(e).__name__}: {e}")
+                print(
+                    f"[md] disconnect session={self._tracker.last_session} err={type(e).__name__}: {e}"
+                )
                 # backoff with jitter
                 jitter = random.uniform(0, 0.3)
                 sleep_s = min(max_backoff_s, backoff_s) + jitter
@@ -88,12 +94,12 @@ class BinanceMarketDataGateway:
                 print(f"[md] error={e!r}, reconnect in {sleep_s:.2f}s")
                 await asyncio.sleep(sleep_s)
                 backoff_s *= 1.8
-        
+
     async def _consume(self, ws: WebSocketClientProtocol) -> None:
         last_msg_ns = monotonic_ns()
 
         recv_timeout_s = 3
-        stale_timeout_ns = int(15 * 1e9) # 15s 没消息认为连接挂了(可以调节)
+        stale_timeout_ns = int(15 * 1e9)  # 15s 没消息认为连接挂了(可以调节)
 
         while True:
             try:
@@ -103,7 +109,7 @@ class BinanceMarketDataGateway:
                 if now - last_msg_ns > stale_timeout_ns:
                     raise RuntimeError("stale websocket: no messages")
                 continue
-            
+
             ts_recv = monotonic_ns()
             last_msg_ns = ts_recv
 
@@ -112,7 +118,7 @@ class BinanceMarketDataGateway:
             me = self._parse_book_ticker(raw, ts_recv_ns=ts_recv)
             if me is not None:
                 self.on_event(me)
-    
+
     def _parse_book_ticker(self, raw: str, *, ts_recv_ns: int) -> MarketEvent | None:
         """
         Binance bookTicker payload (typical)
@@ -152,5 +158,5 @@ class BinanceMarketDataGateway:
             ask=ask,
             bid_sz=bid_sz,
             ask_sz=ask_sz,
-            source=self.source
+            source=self.source,
         )

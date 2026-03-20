@@ -4,13 +4,21 @@ import asyncio
 import os
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from trading_core.bus.bus import EventBus
 from trading_core.core.oms import OMS, OrderEvent, OrderIntent
-from trading_core.gateway.binance_rest_exec import BinanceRestConfig, BinanceRestExecutionGateway
-from trading_core.gateway.binance_wsapi_userstream import BinanceWsApiConfig, BinanceWsApiUserStream
+from trading_core.gateway.binance_rest_exec import (
+    BinanceRestConfig,
+    BinanceRestExecutionGateway,
+)
+from trading_core.gateway.binance_wsapi_userstream import (
+    BinanceWsApiConfig,
+    BinanceWsApiUserStream,
+)
 from trading_core.core import monotonic_ns, risk
+
 
 async def main() -> None:
     """
@@ -35,7 +43,9 @@ async def main() -> None:
         BinanceRestConfig(
             api_key=api_key,
             api_secret=api_secret,
-            rest_base=os.environ.get("BINANCE_REST_BASE", "https://testnet.binance.vision"),
+            rest_base=os.environ.get(
+                "BINANCE_REST_BASE", "https://testnet.binance.vision"
+            ),
         )
     )
 
@@ -43,7 +53,9 @@ async def main() -> None:
         BinanceWsApiConfig(
             api_key=api_key,
             api_secret=api_secret,
-            ws_api_url=os.environ.get("BINANCE_WSAPI_URL", "wss://ws-api.testnet.binance.vision/ws-api/v3"),
+            ws_api_url=os.environ.get(
+                "BINANCE_WSAPI_URL", "wss://ws-api.testnet.binance.vision/ws-api/v3"
+            ),
         ),
         on_event=bus.publish,
     )
@@ -72,7 +84,7 @@ async def main() -> None:
                         reason=f"rest_error:{type(e).__name__}:{e}",
                     )
                 )
-    
+
     bus.subscribe("intent", lambda it: asyncio.create_task(handle_intent(it)))
 
     # ---- Manual smoke test intent ----
@@ -83,7 +95,7 @@ async def main() -> None:
             symbol="btcusdt",
             side="buy",
             qty=0.0001,
-            price=100.0, # far away: should ACK but not fill quickly
+            price=100.0,  # far away: should ACK but not fill quickly
             ts_ns=monotonic_ns(),
         )
     )
@@ -94,6 +106,7 @@ async def main() -> None:
             await asyncio.sleep(0.01)
     finally:
         t_us.cancel()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

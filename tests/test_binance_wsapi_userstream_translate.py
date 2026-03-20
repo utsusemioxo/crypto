@@ -20,7 +20,13 @@ def _make_stream() -> BinanceWsApiUserStream:
 def test_translate_execution_report_new_maps_to_ack_order_event():
     stream = _make_stream()
     out = stream._translate_execution_report(
-        {"e": "executionReport", "c": "intent-1", "i": 123, "x": "NEW", "E": 1700000000000}
+        {
+            "e": "executionReport",
+            "c": "intent-1",
+            "i": 123,
+            "x": "NEW",
+            "E": 1700000000000,
+        }
     )
 
     assert out is not None
@@ -37,7 +43,13 @@ def test_translate_execution_report_new_maps_to_ack_order_event():
 def test_translate_execution_report_rejected_includes_reason():
     stream = _make_stream()
     out = stream._translate_execution_report(
-        {"e": "executionReport", "c": "intent-2", "i": 456, "x": "REJECTED", "r": "LOT_SIZE"}
+        {
+            "e": "executionReport",
+            "c": "intent-2",
+            "i": 456,
+            "x": "REJECTED",
+            "r": "LOT_SIZE",
+        }
     )
 
     assert out is not None
@@ -82,7 +94,9 @@ def test_translate_execution_report_trade_emits_fill_and_partial_order():
     assert order.status == "PARTIAL"
 
 
-def test_translate_execution_report_uses_local_time_when_event_time_missing(monkeypatch):
+def test_translate_execution_report_uses_local_time_when_event_time_missing(
+    monkeypatch,
+):
     stream = _make_stream()
     monkeypatch.setattr(us_mod.time, "time_ns", lambda: 4242)
 
@@ -101,7 +115,14 @@ def test_translate_execution_report_uses_local_time_when_event_time_missing(monk
 def test_translate_execution_report_returns_none_for_invalid_trade_payload():
     stream = _make_stream()
     out = stream._translate_execution_report(
-        {"e": "executionReport", "c": "intent-5", "i": 1000, "x": "TRADE", "l": "NaN?", "L": "100.0"}
+        {
+            "e": "executionReport",
+            "c": "intent-5",
+            "i": 1000,
+            "x": "TRADE",
+            "l": "NaN?",
+            "L": "100.0",
+        }
     )
 
     assert out is None

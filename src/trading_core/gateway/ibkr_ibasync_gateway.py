@@ -82,7 +82,9 @@ class IbkrIbAsyncGateway:
     on_event: Callable[[object], None]
 
     _ib: Any = field(default=None, init=False, repr=False)
-    _orderid_to_intent: Dict[int, str] = field(default_factory=dict, init=False, repr=False)
+    _orderid_to_intent: Dict[int, str] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     async def connect(self) -> None:
         ib_mod = self._import_ib_async()
@@ -95,7 +97,9 @@ class IbkrIbAsyncGateway:
             timeout=self.cfg.connect_timeout_s,
         )
         self._attach_handlers()
-        print(f"[ibkr] connected host={self.cfg.host} port={self.cfg.port} client_id={self.cfg.client_id}")
+        print(
+            f"[ibkr] connected host={self.cfg.host} port={self.cfg.port} client_id={self.cfg.client_id}"
+        )
 
     async def disconnect(self) -> None:
         if self._ib is None:
@@ -130,14 +134,18 @@ class IbkrIbAsyncGateway:
                 await asyncio.sleep(min(max_backoff_s, backoff_s))
                 backoff_s *= 1.8
 
-    async def place_limit(self, it: OrderIntent, *, tif: str = "DAY", outside_rth: bool = False) -> int:
+    async def place_limit(
+        self, it: OrderIntent, *, tif: str = "DAY", outside_rth: bool = False
+    ) -> int:
         if self._ib is None or not self._ib.isConnected():
             raise RuntimeError("ibkr not connected")
 
         ib_mod = self._import_ib_async()
 
         symbol = it.symbol.upper()
-        contract = ib_mod.Stock(symbol, self.cfg.default_exchange, self.cfg.default_currency)
+        contract = ib_mod.Stock(
+            symbol, self.cfg.default_exchange, self.cfg.default_currency
+        )
 
         order = ib_mod.LimitOrder(
             action=it.side.upper(),
@@ -150,7 +158,9 @@ class IbkrIbAsyncGateway:
         )
 
         trade = self._ib.placeOrder(contract, order)
-        order_id = int(getattr(order, "orderId", 0) or getattr(trade.order, "orderId", 0) or 0)
+        order_id = int(
+            getattr(order, "orderId", 0) or getattr(trade.order, "orderId", 0) or 0
+        )
         if order_id:
             self._orderid_to_intent[order_id] = it.intent_id
         return order_id
@@ -202,8 +212,14 @@ class IbkrIbAsyncGateway:
         if not mapped:
             return
 
-        order_id = int(getattr(order, "orderId", 0) or getattr(order_status, "orderId", 0) or 0)
-        perm_id = getattr(order, "permId", 0) or getattr(order_status, "permId", 0) or order_id
+        order_id = int(
+            getattr(order, "orderId", 0) or getattr(order_status, "orderId", 0) or 0
+        )
+        perm_id = (
+            getattr(order, "permId", 0)
+            or getattr(order_status, "permId", 0)
+            or order_id
+        )
         exch_id = str(perm_id) if perm_id else str(order_id)
 
         intent_id = self._resolve_intent_id(trade, order_id)
@@ -231,8 +247,12 @@ class IbkrIbAsyncGateway:
             return
 
         order = getattr(trade, "order", None)
-        order_id = int(getattr(order, "orderId", 0) or getattr(execution, "orderId", 0) or 0)
-        perm_id = getattr(order, "permId", 0) or getattr(execution, "permId", 0) or order_id
+        order_id = int(
+            getattr(order, "orderId", 0) or getattr(execution, "orderId", 0) or 0
+        )
+        perm_id = (
+            getattr(order, "permId", 0) or getattr(execution, "permId", 0) or order_id
+        )
         exch_id = str(perm_id) if perm_id else str(order_id)
 
         intent_id = self._resolve_intent_id(trade, order_id)
